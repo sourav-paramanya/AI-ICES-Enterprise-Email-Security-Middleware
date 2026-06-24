@@ -1,0 +1,57 @@
+# AI-ICES Prometheus Configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "ai-ices-core-hub"
+    static_configs:
+      - targets: ["core_hub:8000"]
+
+  - job_name: "ai-ices-gateway"
+    static_configs:
+      - targets: ["gateway:8899"]
+
+  - job_name: "ai-ices-governance"
+    static_configs:
+      - targets: ["governance_api:8080"]
+
+  - job_name: "ai-ices-dashboard"
+    static_configs:
+      - targets: ["dashboard_backend:3000"]
+
+  - job_name: "ai-ices-nlp"
+    static_configs:
+      - targets: ["nlp_engine:8100"]
+
+  - job_name: "ai-ices-vision"
+    static_configs:
+      - targets: ["vision_engine:8200"]
+
+  - job_name: "ai-ices-url"
+    static_configs:
+      - targets: ["url_protection:8300"]
+
+  - job_name: "ai-ices-cdr"
+    static_configs:
+      - targets: ["cdr_engine:8400"]
+
+  - job_name: "ai-ices-orchestrator"
+    static_configs:
+      - targets: ["threat_orchestrator:8500"]
+
+  - job_name: "ai-ices-remediation"
+    static_configs:
+      - targets: ["remediation_engine:8600"]
+
+  - job_name: "rabbitmq"
+    static_configs:
+      - targets: ["rabbitmq:15692"]
+
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres:9187"]
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis:9121"]

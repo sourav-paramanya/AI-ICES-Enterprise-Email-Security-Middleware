@@ -1,0 +1,358 @@
+# AI-ICES Enterprise Email Security Middleware
+# Development Docker Compose Configuration
+# Version: 1.0.0
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── Data Infrastructure ──────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-ices-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_ices}
+      POSTGRES_USER: ${POSTGRES_USER:-ai_ices}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_ices_dev}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_ices} -d ${POSTGRES_DB:-ai_ices}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ai-ices-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-les_admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ai_ices_dev}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-les_vhost}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-ices-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  # ── Applications ─────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.gateway
+    container_name: ai-ices-gateway
+    ports:
+      - "${GATEWAY_PORT:-8899}:8899"
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_HOST=rabbitmq
+      - REDIS_HOST=redis
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  core_hub:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.core_hub
+    container_name: ai-ices-core-hub
+    ports:
+      - "${CORE_HUB_PORT:-8000}:8000"
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_HOST=rabbitmq
+      - REDIS_HOST=redis
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  governance_api:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.governance_api
+    container_name: ai-ices-governance
+    ports:
+      - "${GOVERNANCE_API_PORT:-8080}:8080"
+    environment:
+      - POSTGRES_HOST=postgres
+      - RABBITMQ_HOST=rabbitmq
+      - REDIS_HOST=redis
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  dashboard_backend:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.dashboard_backend
+    container_name: ai-ices-dashboard
+    ports:
+      - "${DASHBOARD_BACKEND_PORT:-3000}:3000"
+    environment:
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+    env_file:
+      - ../../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  # ── AI Services ──────────────────────────────────────────────────────
+  nlp_engine:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.nlp_engine
+    container_name: ai-ices-nlp
+    ports:
+      - "8100:8100"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  vision_engine:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.vision_engine
+    container_name: ai-ices-vision
+    ports:
+      - "8200:8200"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  url_protection:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.url_protection
+    container_name: ai-ices-url
+    ports:
+      - "8300:8300"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - REDIS_HOST=redis
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  cdr_engine:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.cdr_engine
+    container_name: ai-ices-cdr
+    ports:
+      - "8400:8400"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  threat_orchestrator:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.threat_orchestrator
+    container_name: ai-ices-orchestrator
+    ports:
+      - "8500:8500"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - POSTGRES_HOST=postgres
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  remediation_engine:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.remediation_engine
+    container_name: ai-ices-remediation
+    ports:
+      - "8600:8600"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  celery_worker:
+    build:
+      context: ../..
+      dockerfile: deployment/docker/Dockerfile.celery_worker
+    container_name: ai-ices-celery
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+      - REDIS_HOST=redis
+      - POSTGRES_HOST=postgres
+    env_file:
+      - ../../.env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  # ── Monitoring ───────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-ices-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai-ices-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    logging: *default-logging
+    networks:
+      - ai-ices-network
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  ai-ices-network:
+    driver: bridge

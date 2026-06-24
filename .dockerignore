@@ -1,0 +1,75 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Secrets
+secrets/
+vault/
+*.pem
+*.key
+*.crt
+
+# Tests
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Cache
+.ruff_cache/
+.mypy_cache/
+.cache/
+.huggingface/
+
+# Data
+postgres_data/
+rabbitmq_data/
+docker-volumes/
+models/
+checkpoints/
+weights/
+
+# Logs
+logs/
+*.log
+
+# Docs
+docs/
+
+# Kubernetes
+*.kubeconfig
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+uploads/
+attachments/
+temp/
+tmp/
