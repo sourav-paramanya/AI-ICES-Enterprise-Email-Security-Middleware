@@ -31,14 +31,50 @@ AI-ICES is a modular, event-driven system designed to intercept, analyze, and re
 ## Getting Started
 
 ### Prerequisites
-*   Docker & Docker Compose
-*   Python 3.12+ (for local development)
+*   Docker & Docker Compose (ensure Docker Engine is running)
+*   Python 3.12+ (if you wish to run services locally outside of Docker)
+
+### Setup Instructions
+
+1.  **Clone the repository**:
+    ```bash
+    git clone <repository-url>
+    cd AI-ICES-Enterprise-Email-Security-Middleware
+    ```
+
+2.  **Configure environment variables**:
+    Copy the example environment file and customize it for your environment:
+    ```bash
+    cp .env.example .env
+    # Edit the .env file to set required secrets (e.g., SECRET_KEY, DB_PASSWORD, RABBITMQ_PASSWORD)
+    ```
+
+3.  **Database Migration**:
+    Before starting the services, ensure the database schema is up-to-date:
+    ```bash
+    # If running with docker-compose:
+    docker-compose -f deployment/compose/docker-compose.yml run governance_api alembic upgrade head
+    ```
 
 ### Running the System
-```bash
-# Start all services
-docker-compose -f deployment/compose/docker-compose.yml up --build
-```
+
+1.  **Using Docker Compose (Recommended)**:
+    Start all services in detached mode:
+    ```bash
+    docker-compose -f deployment/compose/docker-compose.yml up -d --build
+    ```
+
+2.  **Verify Service Status**:
+    Check the logs for any startup errors:
+    ```bash
+    docker-compose -f deployment/compose/docker-compose.yml logs -f
+    ```
+
+3.  **Check Health**:
+    Each service provides a `/health` endpoint. You can verify they are running via curl or a web browser:
+    ```bash
+    curl http://localhost:8300/health  # Governance API example
+    ```
 
 ## Project Structure
 ```text
